@@ -2,7 +2,7 @@ syntax = "proto3";
 
 package messaging;
 
-service MessagingService {
+service Messaging {
   rpc SendMessage (MessageRequest) returns (MessageResponse) {}
   rpc ReceiveMessage (MessageRequest) returns (stream MessageResponse) {}
 }
@@ -11,6 +11,7 @@ message MessageRequest {
   string sender = 1;
   string recipient = 2;
   string message = 3;
+  int64 timestamp = 4;
 }
 
 message MessageResponse {
