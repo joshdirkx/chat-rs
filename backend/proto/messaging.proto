@@ -3,20 +3,20 @@ syntax = "proto3";
 package messaging;
 
 service Messaging {
-  rpc SendMessage (MessageRequest) returns (MessageResponse) {}
-  rpc ReceiveMessage (MessageRequest) returns (stream MessageResponse) {}
+  rpc SendMessage (SendMessageRequest) returns (SendMessageResponse) {}
 }
 
-message MessageRequest {
-  string sender = 1;
-  string recipient = 2;
+message User {
+  string user_uuid = 1;
+}
+
+message SendMessageRequest {
+  User sender = 1;
+  User recipient = 2;
   string message = 3;
   int64 timestamp = 4;
 }
 
-message MessageResponse {
-  string sender = 1;
-  string recipient = 2;
-  string message = 3;
-  int64 timestamp = 4;
+message SendMessageResponse {
+  string message_uuid = 1;
 }
