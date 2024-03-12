@@ -60,10 +60,12 @@ impl Messaging for MessagingService {
             .await
             .map_err(|e| tonic::Status::internal(e.to_string()))?;
 
+        let user_create_request = request.get_ref();
+
         let user_params = User {
             id: 1,
-            first_name: "Tester".to_string(),
-            last_name: "McTesterson".to_string(),
+            first_name: user_create_request.first_name.to_string(),
+            last_name: user_create_request.last_name.to_string(),
         };
 
         let query = "
