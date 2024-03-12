@@ -4,10 +4,35 @@ package messaging;
 
 service Messaging {
   rpc SendMessage (SendMessageRequest) returns (SendMessageResponse) {}
+  rpc CreateUser (CreateUserRequest) returns (CreateUserResponse) {}
+  rpc GetUser (GetUserRequest) returns (GetUserResponse) {}
 }
 
 message User {
-  string user_uuid = 1;
+  string user_id = 1;
+  string first_name = 2;
+  string last_name = 3;
+}
+
+message CreateUserRequest {
+  string first_name = 1;
+  string last_name = 2;
+}
+
+message CreateUserResponse {
+  string user_id = 1;
+  string first_name = 2;
+  string last_name = 3;
+}
+
+message GetUserRequest {
+  string user_id = 1;
+}
+
+message GetUserResponse {
+  string user_id = 1;
+  string first_name = 2;
+  string last_name = 3;
 }
 
 message SendMessageRequest {
@@ -18,5 +43,5 @@ message SendMessageRequest {
 }
 
 message SendMessageResponse {
-  string message_uuid = 1;
+  string message_id = 1;
 }
