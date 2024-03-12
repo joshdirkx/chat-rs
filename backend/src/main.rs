@@ -20,7 +20,7 @@ struct MessagingService {}
 
 #[derive(Serialize, Debug, Clone, sqlx::FromRow)]
 pub struct User {
-    pub id: i32,
+    pub id: Option<i32>,
     pub first_name: String,
     pub last_name: String,
 }
@@ -63,7 +63,7 @@ impl Messaging for MessagingService {
         let user_create_request = request.get_ref();
 
         let user_params = User {
-            id: 1,
+            id: None,
             first_name: user_create_request.first_name.to_string(),
             last_name: user_create_request.last_name.to_string(),
         };
@@ -82,7 +82,7 @@ impl Messaging for MessagingService {
             .map_err(|e| tonic::Status::internal(e.to_string()))?;
 
         let user_response = proto::CreateUserResponse {
-            user_id: row.id,
+            user_id: row.id.unwrap(),
             first_name: row.first_name,
             last_name: row.last_name,
         };
