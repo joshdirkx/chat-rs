@@ -1,13 +1,24 @@
 extern crate derive_builder;
 
+use lazy_static::lazy_static;
 use serde::Serialize;
-use sqlx_postgres::PgPoolOptions;
+use sqlx_postgres::{PgPool, PgPoolOptions};
 use tonic::transport::Server;
 
 use proto::messaging_server::Messaging;
 
 use crate::proto::messaging_server::MessagingServer;
 
+lazy_static!(
+    static ref DATABASE_POOL: PgPool = {
+        let database_url = "postgres://postgres:password@localhost/messaging";
+        
+        PgPoolOptions::new()
+            .max_connections(5)
+            .connect_lazy(&database_url)
+            .expect("Failed to create pool")
+    };
+);
 mod proto {
     tonic::include_proto!("messaging");
 
@@ -54,12 +65,6 @@ impl Messaging for MessagingService {
         &self,
         request: tonic::Request<proto::CreateUserRequest>,
     ) -> Result<tonic::Response<proto::CreateUserResponse>, tonic::Status> {
-        let pool = PgPoolOptions::new()
-            .max_connections(5)
-            .connect("postgres://postgres:password@localhost/messaging")
-            .await
-            .map_err(|e| tonic::Status::internal(e.to_string()))?;
-
         let user_create_request = request.get_ref();
 
         let user_params = User {
@@ -77,7 +82,7 @@ impl Messaging for MessagingService {
         let row = sqlx::query_as::<_, User>(query)
             .bind(&user_params.first_name)
             .bind(&user_params.last_name)
-            .fetch_one(&pool)
+            .fetch_one(&*DATABASE_POOL)
             .await
             .map_err(|e| tonic::Status::internal(e.to_string()))?;
 
