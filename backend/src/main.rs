@@ -1,8 +1,11 @@
 extern crate derive_builder;
 
+use futures_util::StreamExt;
 use lazy_static::lazy_static;
 use serde::Serialize;
 use sqlx_postgres::{PgPool, PgPoolOptions};
+use tokio::net::TcpListener;
+use tokio_tungstenite::accept_async;
 use tonic::transport::Server;
 
 use proto::messaging_server::Messaging;
@@ -12,7 +15,7 @@ use crate::proto::messaging_server::MessagingServer;
 lazy_static!(
     static ref DATABASE_POOL: PgPool = {
         let database_url = "postgres://postgres:password@localhost/messaging";
-        
+
         PgPoolOptions::new()
             .max_connections(5)
             .connect_lazy(&database_url)
@@ -45,22 +48,6 @@ pub struct Message {
 
 #[tonic::async_trait]
 impl Messaging for MessagingService {
-    async fn send_message(
-        &self,
-        request: tonic::Request<proto::SendMessageRequest>,
-    ) -> Result<tonic::Response<proto::SendMessageResponse>, tonic::Status> {
-        let message_request = request.get_ref();
-
-        let sender_uuid = &message_request.sender.as_ref().unwrap().user_id;
-        let recipient_uuid = &message_request.recipient.as_ref().unwrap().user_id;
-
-        let message_response = proto::SendMessageResponse {
-            message_id: 1,
-        };
-
-        Ok(tonic::Response::new(message_response))
-    }
-
     async fn create_user(
         &self,
         request: tonic::Request<proto::CreateUserRequest>,
@@ -99,10 +86,22 @@ impl Messaging for MessagingService {
         &self,
         request: tonic::Request<proto::GetUserRequest>,
     ) -> Result<tonic::Response<proto::GetUserResponse>, tonic::Status> {
+        let user_create_request = request.get_ref();
+
+        let query = format!(
+            "SELECT id, first_name, last_name FROM users WHERE id = {}",
+            user_create_request.user_id
+        );
+
+        let row = sqlx::query_as::<_, User>(&query)
+            .fetch_one(&*DATABASE_POOL)
+            .await
+            .map_err(|e| tonic::Status::internal(e.to_string()))?;
+
         let user_response = proto::GetUserResponse {
-            user_id: 1,
-            first_name: "Josh".to_string(),
-            last_name: "Dirkx".to_string(),
+            user_id: row.id.unwrap(),
+            first_name: row.first_name,
+            last_name: row.last_name,
         };
 
         Ok(tonic::Response::new(user_response))
@@ -111,21 +110,40 @@ impl Messaging for MessagingService {
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let addr = "[::1]:50051".parse()?;
-
-    let messaging_service = MessagingService::default();
-
     let reflector = tonic_reflection::server::Builder::configure()
         .register_encoded_file_descriptor_set(proto::FILE_DESCRIPTOR_SET)
         .build()?;
 
-    let messaging_server = MessagingServer::new(messaging_service);
+    let messaging_server = MessagingServer::new(MessagingService::default());
 
-    Server::builder()
+    let grpc_server = Server::builder()
         .add_service(reflector)
         .add_service(messaging_server)
-        .serve(addr)
-        .await?;
+        .serve("[::1]:50051".parse()?);
+
+    let websocket_server = async {
+        let listener = TcpListener::bind("127.0.0.1:8080").await.unwrap();
+        println!("WebSocket Server listening on: 127.0.0.1:8080");
+
+        while let Ok((stream, _)) = listener.accept().await {
+            tokio::spawn(handle_connection(stream));
+        }
+    };
+
+    tokio::select! {
+        _ = grpc_server => println!("gRPC server exited"),
+        _ = websocket_server => println!("WebSocket server exited"),
+    }
 
     Ok(())
+}
+
+async fn handle_connection(stream: tokio::net::TcpStream) {
+    let ws_stream = accept_async(stream)
+        .await
+        .expect("Error during the websocket handshake occurred");
+    println!("New WebSocket connection");
+
+    let (write, read) = ws_stream.split();
+    read.forward(write).await.expect("Failed to forward message");
 }

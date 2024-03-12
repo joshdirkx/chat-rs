@@ -8,6 +8,7 @@ edition = "2021"
 [dependencies]
 tonic = "0.11.0"
 tokio = { version = "1.36.0", features = ["full"] }
+tokio-tungstenite = "0.21.0"
 prost = "0.12.3"
 derive_builder = "0.20.0"
 tonic-reflection = "0.11.0"
@@ -16,6 +17,7 @@ sqlx = { version = "0.7.3", features = ["runtime-tokio", "uuid"] }
 sqlx-postgres = "0.7.3"
 serde = { version = "1.0.197", features = ["derive"] }
 lazy_static = "1.4.0"
+futures-util = "0.3.30"
 
 [build-dependencies]
 tonic-build = "0.11.0"

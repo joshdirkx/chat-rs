@@ -3,7 +3,6 @@ syntax = "proto3";
 package messaging;
 
 service Messaging {
-  rpc SendMessage (SendMessageRequest) returns (SendMessageResponse) {}
   rpc CreateUser (CreateUserRequest) returns (CreateUserResponse) {}
   rpc GetUser (GetUserRequest) returns (GetUserResponse) {}
 }
@@ -33,15 +32,4 @@ message GetUserResponse {
   int32 user_id = 1;
   string first_name = 2;
   string last_name = 3;
-}
-
-message SendMessageRequest {
-  User sender = 1;
-  User recipient = 2;
-  string message = 3;
-  int64 timestamp = 4;
-}
-
-message SendMessageResponse {
-  int32 message_id = 1;
 }
