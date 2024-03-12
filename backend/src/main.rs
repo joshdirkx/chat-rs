@@ -44,7 +44,7 @@ impl Messaging for MessagingService {
         let recipient_uuid = &message_request.recipient.as_ref().unwrap().user_id;
 
         let message_response = proto::SendMessageResponse {
-            message_id: 1.to_string(),
+            message_id: 1,
         };
 
         Ok(tonic::Response::new(message_response))
@@ -80,7 +80,7 @@ impl Messaging for MessagingService {
             .map_err(|e| tonic::Status::internal(e.to_string()))?;
 
         let user_response = proto::CreateUserResponse {
-            user_id: row.id.to_string(),
+            user_id: row.id,
             first_name: row.first_name,
             last_name: row.last_name,
         };
@@ -93,7 +93,7 @@ impl Messaging for MessagingService {
         request: tonic::Request<proto::GetUserRequest>,
     ) -> Result<tonic::Response<proto::GetUserResponse>, tonic::Status> {
         let user_response = proto::GetUserResponse {
-            user_id: 1.to_string(),
+            user_id: 1,
             first_name: "Josh".to_string(),
             last_name: "Dirkx".to_string(),
         };
