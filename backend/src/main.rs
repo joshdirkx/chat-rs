@@ -1,27 +1,22 @@
 extern crate derive_builder;
 
+use futures_util::SinkExt;
 use futures_util::StreamExt;
-use lazy_static::lazy_static;
-use serde::Serialize;
-use sqlx_postgres::{PgPool, PgPoolOptions};
-use tokio::net::TcpListener;
+use serde::{Deserialize, Serialize};
+use serde_json::Error;
+use tokio::net::{TcpListener, TcpStream};
 use tokio_tungstenite::accept_async;
 use tonic::transport::Server;
 
 use proto::messaging_server::Messaging;
 
+use crate::db::DATABASE_POOL;
 use crate::proto::messaging_server::MessagingServer;
+use crate::websocket_message::IncomingWebsocketMessage;
 
-lazy_static!(
-    static ref DATABASE_POOL: PgPool = {
-        let database_url = "postgres://postgres:password@localhost/messaging";
+mod db;
+mod websocket_message;
 
-        PgPoolOptions::new()
-            .max_connections(5)
-            .connect_lazy(&database_url)
-            .expect("Failed to create pool")
-    };
-);
 mod proto {
     tonic::include_proto!("messaging");
 
@@ -138,12 +133,52 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
-async fn handle_connection(stream: tokio::net::TcpStream) {
+async fn handle_connection(stream: TcpStream) {
     let ws_stream = accept_async(stream)
         .await
         .expect("Error during the websocket handshake occurred");
     println!("New WebSocket connection");
 
-    let (write, read) = ws_stream.split();
-    read.forward(write).await.expect("Failed to forward message");
+    let (mut write, mut read) = ws_stream.split();
+
+    while let Some(message) = read.next().await {
+        match message {
+            Ok(msg) => {
+                if msg.is_text() {
+                    let text = msg.to_text().unwrap();
+
+                    let parsed_message: Result<IncomingWebsocketMessage, Error> =
+                        serde_json::from_str(text);
+
+                    match parsed_message {
+                        Ok(parsed) => {
+                            println!("Received message: {:?}", parsed);
+                            let query = "
+                                INSERT INTO messages (sender_id, recipient_id, message_contents)
+                                VALUES ($1, $2, $3)
+                                RETURNING id, sender_id, recipient_id, message_contents
+                            ";
+
+                            let row = sqlx::query_as::<_, User>(query)
+                                .bind(&parsed.sender_id)
+                                .bind(&parsed.recipient_id)
+                                .bind(&parsed.message_contents)
+                                .fetch_one(&*DATABASE_POOL)
+                                .await
+                                .map_err(|e| tonic::Status::internal(e.to_string()));
+                        }
+                        Err(e) => {
+                            println!("Failed to parse message as JSON: {:?}", e);
+                        }
+                    }
+                }
+                // Echo the message back
+                write.send(msg).await.expect("Failed to send message");
+            }
+            Err(e) => {
+                eprintln!("Error processing message: {}", e);
+                break;
+            }
+        }
+    }
 }
